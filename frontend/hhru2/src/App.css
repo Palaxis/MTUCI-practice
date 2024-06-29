@@ -1,0 +1,35 @@
+.app-container {
+  display: flex;
+}
+
+.search-section {
+  flex: 1;
+  padding: 20px;
+  border-right: 1px solid #ccc;
+}
+
+.results-section {
+  flex: 3;
+  padding: 20px;
+}
+
+.vacancy-form {
+  margin-bottom: 20px;
+}
+
+.vacancy-form div {
+  margin-bottom: 10px;
+}
+
+.vacancy-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.vacancy-item {
+  margin-bottom: 10px;
+}
+
+.vacancy-item h3 {
+  margin: 0;
+}
