@@ -6,25 +6,71 @@ import './App.css';
 
 const App = () => {
   const [vacancies, setVacancies] = useState([]);
+  const [renderTrigger, setrenderTrigger] = useState(1);
+
+  const [minimalSalary, setminimalSalary] = useState(0)
+  const [maximalSalary, setmaximalSalary] = useState(10000000)
+
+  const getAllVacancies = async () => {
+    let salary_from = parseFloat(minimalSalary);
+      let salary_to = parseFloat(maximalSalary);
+    try {
+      const response = await axios.get(`http://localhost:8000/get_all_vacancies/`, { 
+        params: {salary_from, salary_to},
+      });
+      setVacancies(response.data);
+    } catch (error) {
+      console.error('Error fetching vacancies:', error);
+      setVacancies([]);
+    }
+  }
+  
 
   const handleSearch = async (name) => {
     try {
       const response = await axios.get(`http://localhost:8000/vacancies/`, {
+        params: { name }
+      });
+      setVacancies(response.data);
+    } catch (error) {
+      console.error('Error fetching vacancies:', error);
+      setVacancies([]);
+    }
+  };
+  
+  const handleSimilarSearch = async (name) => {
+    try {
+      const response = await axios.get(`http://localhost:8000/similar_name_vacancies/`, {
         params: { name },
       });
       setVacancies(response.data);
     } catch (error) {
       console.error('Error fetching vacancies:', error);
+      setVacancies([]);
     }
   };
+
+  const deleteVacancy = (vacancy_id, valueToRemove) =>{    
+    try{
+      axios.delete(`http://localhost:8000/delete_vacancy/`, {params: {vacancy_id}})
+      setVacancies(vacancies.filter(item => item !== valueToRemove))
+      setrenderTrigger(renderTrigger+1);
+    }
+    catch(err){
+      console.error('Error deleting item:', err);
+    }
+
+  }
+
 
   return (
     <div className="app-container">
       <div className="search-section">
-        <VacancyForm onSearch={handleSearch} />
+        <VacancyForm onSearch={handleSearch} onSimilarSearch = {handleSimilarSearch} getAllVacancies={getAllVacancies} setminimalSalary={setminimalSalary} minimalSalary={minimalSalary}
+        setmaximalSalary={setmaximalSalary} maximalSalary={maximalSalary}/>
       </div>
       <div className="results-section">
-        <VacancyList vacancies={vacancies} />
+        <VacancyList vacancies={vacancies} deleteVacancy={deleteVacancy} renderTrigger={renderTrigger}/>
       </div>
     </div>
   );

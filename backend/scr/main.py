@@ -1,7 +1,10 @@
 from fastapi import FastAPI, HTTPException, Depends 
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.future import select
+from sqlalchemy import delete
+from sqlalchemy.sql import and_
 import requests 
 from datetime import datetime 
 from pydantic import BaseModel
@@ -44,22 +47,35 @@ def extract_fields(vacancy):
         'responsibility': vacancy['snippet']['responsibility'] if vacancy.get('snippet') else None, 
     }
 
-async def save_vacancies_to_db(vacancies, db: AsyncSession): 
-    for item in vacancies: 
-        fields = extract_fields(item) 
-        # Распаковка словаря
+async def save_vacancies_to_db(vacancies, db: AsyncSession):
+    for item in vacancies:
+        fields = extract_fields(item)
         print(fields)
-        vacancy = Vacancy(**fields)
-        # Добавление vacancy в базу данных
-        db.add(vacancy) 
+
+        insert_stmt = pg_insert(Vacancy).values(**fields)
+        upsert_stmt = insert_stmt.on_conflict_do_update(
+            index_elements=['id'],  # Укажите ключевые столбцы для конфликта
+            set_=fields  # Поля для обновления при конфликте
+        )
+
+        await db.execute(upsert_stmt)
+
     await db.commit()
 
-async def get_all_vacancies(db: AsyncSession): 
-    result = await db.execute(select(Vacancy))
+async def get_all_vacancies(minimal_salary: float, maximal_salary: float, db: AsyncSession): 
+    result = await db.execute(select(Vacancy).where( and_(Vacancy.salary_from > minimal_salary, Vacancy.salary_to < maximal_salary)))
     return result.scalars().all()
 
-async def get_vacancies_by_name(name: str, db: AsyncSession):
+async def get_vacancies_by_id(id: int, db: AsyncSession):
+    result = await db.execute(select(Vacancy).where(Vacancy.id == id))
+    return result.scalars().all()
+
+async def get_vacancies_by_exact_name(name: str, db: AsyncSession):
     result = await db.execute(select(Vacancy).where(Vacancy.name == name))
+    return result.scalars().all()
+
+async def get_vacancies_by_similar_name(name: str, db: AsyncSession):
+    result = await db.execute(select(Vacancy).where(Vacancy.name.ilike(f'%{name}%')))
     return result.scalars().all()
 
 class VacancyQuery(BaseModel): 
@@ -80,19 +96,46 @@ async def parse_vacancies(vacancy_query: VacancyQuery, db: AsyncSession = Depend
     else: 
         raise HTTPException(status_code=400, detail="Invalid data format received from API") 
 
-    vacancies = await get_all_vacancies(db) 
+    vacancies = data.get('items', []) 
 
-    for vacancy in vacancies: 
-        print(f"ID: {vacancy.id}, Name: {vacancy.name}, Salary_from: {vacancy.salary_from}") 
+    vaclen = len(vacancies)
+    # for item in vacancies: 
+    #     # print(f"ID: {item.id}, Name: {item.name}, Salary_from: {item.salary_from}") 
+    #     vaclen += 1
 
-    # print('parsed data:')
-    # print(data)
-    return {"message": "Parsed and saved successfully"}
+    # print(vaclen)
+    print(vacancies)
+    return {"message": f'Parsed and saved successfully {vaclen} vacancies'}
 
-@app.get("/vacancies/")
-async def fetch_vacancies(name: str, db: AsyncSession = Depends(get_db)):
-    vacancies = await get_vacancies_by_name(name, db)
+@app.get("/get_all_vacancies/")
+async def fetch_vacancies(salary_from: float, salary_to: float, db: AsyncSession = Depends(get_db)):
+    vacancies = await get_all_vacancies(salary_from, salary_to, db)
     if not vacancies:
         raise HTTPException(status_code=404, detail="Vacancies not found")
     return vacancies
 
+@app.get("/vacancies/")
+async def fetch_vacancies(name: str, db: AsyncSession = Depends(get_db)):
+    vacancies = await get_vacancies_by_exact_name(name, db)
+    if not vacancies:
+        raise HTTPException(status_code=404, detail="Vacancies not found")
+    return vacancies
+
+@app.get("/similar_name_vacancies/")
+async def fetch_vacancies(name: str, db: AsyncSession = Depends(get_db)):
+    vacancies = await get_vacancies_by_similar_name(name, db)
+    if not vacancies:
+        raise HTTPException(status_code=404, detail="Vacancies not found")
+    return vacancies
+
+@app.delete("/delete_vacancy/")
+async def delete_vacancy(vacancy_id: int, db: AsyncSession = Depends(get_db)):
+    vacancy = await get_vacancies_by_id(vacancy_id, db)
+    if not vacancy:
+        raise HTTPException(status_code=404, detail="Vacancy id not found")
+    
+    stmt = delete(Vacancy).where(Vacancy.id == vacancy_id)
+    result = await db.execute(stmt)
+    await db.commit()
+    print(vacancy)
+    return {"Detail": "Vacancy deleted"}

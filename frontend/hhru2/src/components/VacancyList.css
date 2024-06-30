@@ -1,0 +1,15 @@
+
+
+.vacancy-item {
+    border-width: 2px;
+    border-color: black;
+    border-radius: 13px;
+
+    background-color: beige;
+}
+
+.vacancy-list{
+    background-color: rgb(255, 5, 5);
+    max-height: 100vh;
+    overflow-y: scroll;
+}
