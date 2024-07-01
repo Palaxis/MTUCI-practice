@@ -107,6 +107,33 @@ async def parse_vacancies(vacancy_query: VacancyQuery, db: AsyncSession = Depend
     print(vacancies)
     return {"message": f'Parsed and saved successfully {vaclen} vacancies'}
 
+@app.post("/filter_parse-vacancies") 
+async def parse_vacancies(text: str, per_page: int, page: int,area: int, employment: int, db: AsyncSession = Depends(get_db)): 
+    url = f"https://api.hh.ru/vacancies?text={text}&per_page={per_page}&page={page}&area=1&employment={employment}" 
+    response = requests.get(url) 
+
+    if response.status_code != 200: 
+        raise HTTPException(status_code=response.status_code, detail="Error fetching data from API") 
+
+    data = response.json() 
+
+    if 'items' in data: 
+        await save_vacancies_to_db(data['items'], db) 
+    else: 
+        raise HTTPException(status_code=400, detail="Invalid data format received from API") 
+
+    vacancies = data.get('items', []) 
+
+    vaclen = len(vacancies)
+    # for item in vacancies: 
+    #     # print(f"ID: {item.id}, Name: {item.name}, Salary_from: {item.salary_from}") 
+    #     vaclen += 1
+
+    # print(vaclen)
+    print(vacancies)
+    return {"message": f'Parsed and saved successfully {vaclen} vacancies',
+            "data": vacancies}
+
 @app.get("/get_all_vacancies/")
 async def fetch_vacancies(salary_from: float, salary_to: float, db: AsyncSession = Depends(get_db)):
     vacancies = await get_all_vacancies(salary_from, salary_to, db)
@@ -139,3 +166,10 @@ async def delete_vacancy(vacancy_id: int, db: AsyncSession = Depends(get_db)):
     await db.commit()
     print(vacancy)
     return {"Detail": "Vacancy deleted"}
+
+@app.delete("/drop_all_vacancies/")
+async def delete_all_vacancies(db: AsyncSession = Depends(get_db)):
+    stmt = delete(Vacancy)
+    result = await db.execute(stmt)
+    await db.commit()
+    return {"Detail": "All vacancies deleted"}
