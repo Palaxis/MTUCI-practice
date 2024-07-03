@@ -1,0 +1,45 @@
+.parseDiv{
+    border: 2px solid;
+    border-radius: 10px;
+    text-align: center;
+}
+
+.vacancy-form{
+    border: 2px solid;
+    border-radius: 10px;
+    text-align: center;
+}
+
+.areaSelect{
+    border: 1px solid;
+    border-radius: 10px;
+}
+
+.employmentSelect{
+    border: 1px solid;
+    border-radius: 10px;
+}
+
+.experienceSelect{
+    border: 1px solid;
+    border-radius: 10px;
+}
+
+h5{
+    position: relative;
+    margin: 10px;
+}
+
+h4{
+    position: relative;
+    margin: 10px;
+}
+
+.dropButton{
+    background-color: red;
+    color: white;
+}
+.dropButton:hover{
+    background-color: red;
+    cursor: pointer;
+}

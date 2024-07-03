@@ -8,9 +8,10 @@ from sqlalchemy.sql import and_
 import requests 
 from datetime import datetime 
 from pydantic import BaseModel
+from typing import Optional
 
-from database import engine, get_db, Base
-from models import Vacancy
+from scr.database import engine, get_db, Base
+from scr.models import Vacancy
 
 app = FastAPI()
 
@@ -45,6 +46,7 @@ def extract_fields(vacancy):
         'url': vacancy['url'], 
         'requirement': vacancy['snippet']['requirement'] if vacancy.get('snippet') else None, 
         'responsibility': vacancy['snippet']['responsibility'] if vacancy.get('snippet') else None, 
+        'experience': vacancy['experience']['name'] if vacancy.get('experience') else None,
     }
 
 async def save_vacancies_to_db(vacancies, db: AsyncSession):
@@ -62,7 +64,20 @@ async def save_vacancies_to_db(vacancies, db: AsyncSession):
 
     await db.commit()
 
-async def get_all_vacancies(minimal_salary: float, maximal_salary: float, db: AsyncSession): 
+# def prepare_parse_responce(vacancies):
+#     responce = []
+#     i = 0
+#     for item in vacancies:
+#         responce[i] = extract_fields(item)
+#         i += 1
+#     return responce
+
+
+async def get_all_vacancies(db: AsyncSession): 
+    result = await db.execute(select(Vacancy))
+    return result.scalars().all()
+
+async def get_all_vacancies_by_salary(minimal_salary: float, maximal_salary: float, db: AsyncSession): 
     result = await db.execute(select(Vacancy).where( and_(Vacancy.salary_from > minimal_salary, Vacancy.salary_to < maximal_salary)))
     return result.scalars().all()
 
@@ -108,8 +123,18 @@ async def parse_vacancies(vacancy_query: VacancyQuery, db: AsyncSession = Depend
     return {"message": f'Parsed and saved successfully {vaclen} vacancies'}
 
 @app.post("/filter_parse-vacancies") 
-async def parse_vacancies(text: str, per_page: int, page: int,area: int, employment: int, db: AsyncSession = Depends(get_db)): 
-    url = f"https://api.hh.ru/vacancies?text={text}&per_page={per_page}&page={page}&area=1&employment={employment}" 
+async def parse_vacancies(text: str, per_page: int, page: int,area: int = None, employment: str = None, experience: str = None, db: AsyncSession = Depends(get_db)): 
+    url = f"https://api.hh.ru/vacancies?text={text}&per_page={per_page}&page={page}"
+
+    if area:
+        url += f"&area={area}"
+
+    if employment:
+        url += f"&employment={employment}"
+
+    if experience:
+        url += f"&experience={experience}"
+
     response = requests.get(url) 
 
     if response.status_code != 200: 
@@ -130,18 +155,28 @@ async def parse_vacancies(text: str, per_page: int, page: int,area: int, employm
     #     vaclen += 1
 
     # print(vaclen)
-    print(vacancies)
-    return {"message": f'Parsed and saved successfully {vaclen} vacancies',
-            "data": vacancies}
+    # print(vacancies)
+    
+    # response = prepare_parse_responce(data['items'])
+
+    formatted_vacancies = [extract_fields(item) for item in vacancies]
+    return formatted_vacancies
 
 @app.get("/get_all_vacancies/")
-async def fetch_vacancies(salary_from: float, salary_to: float, db: AsyncSession = Depends(get_db)):
-    vacancies = await get_all_vacancies(salary_from, salary_to, db)
+async def fetch_vacancies(db: AsyncSession = Depends(get_db)):
+    vacancies = await get_all_vacancies(db)
     if not vacancies:
         raise HTTPException(status_code=404, detail="Vacancies not found")
     return vacancies
 
-@app.get("/vacancies/")
+@app.get("/get_all_vacancies_by_salary/")
+async def fetch_vacancies(salary_from: float, salary_to: float, db: AsyncSession = Depends(get_db)):
+    vacancies = await get_all_vacancies_by_salary(salary_from, salary_to, db)
+    if not vacancies:
+        raise HTTPException(status_code=404, detail="Vacancies not found")
+    return vacancies
+
+@app.get("/exact_name_vacancies/")
 async def fetch_vacancies(name: str, db: AsyncSession = Depends(get_db)):
     vacancies = await get_vacancies_by_exact_name(name, db)
     if not vacancies:
