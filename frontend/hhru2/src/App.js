@@ -13,15 +13,42 @@ const App = () => {
 
   const[amount, setAmount] = useState(10);
   const[area, setArea] = useState();
-  const[employment, setEmployment] = useState();
+  const[employment, setEmployment] = useState('Full');
   const[experience, setExperience] = useState();
 
-  const getAllVacanciesBySalary = async () => {
+  const getAllVacancies = async () => {
     let salary_from = parseFloat(minimalSalary);
       let salary_to = parseFloat(maximalSalary);
     try {
-      const response = await axios.get(`http://localhost:8000/get_all_vacancies_by_salary/`, { 
+      const response = await axios.get(`http://localhost:8000/get_all_vacancies/`, { 
         params: {salary_from, salary_to},
+      });
+      setVacancies(response.data);
+    } catch (error) {
+      console.error('Error fetching vacancies:', error);
+      setVacancies([]);
+    }
+  }
+
+  const onMagicParse = async (name) => {
+    try {
+      const response = await axios.get(`http://localhost:8000/parse-vacancies/`, { 
+        params: {name},
+      });
+      setVacancies(response.data);
+    } catch (error) {
+      console.error('Error fetching vacancies:', error);
+      setVacancies([]);
+    }
+  }
+  
+
+  const filterSearch = async (name) => {
+    let salary_from = minimalSalary;
+    let salary_to = maximalSalary;
+    try {
+      const response = await axios.get(`http://localhost:8000/get_filter_vacancies/`, { 
+        params: {salary_from, salary_to, employment, name},
       });
       setVacancies(response.data);
     } catch (error) {
@@ -85,9 +112,9 @@ const App = () => {
   return (
     <div className="app-container">
       <div className="search-section">
-        <VacancyForm onSearch={handleExactNameSearch} onSimilarSearch = {handleSimilarSearch} getAllVacancies={getAllVacanciesBySalary} setminimalSalary={setminimalSalary} minimalSalary={minimalSalary}
+        <VacancyForm onSearch={handleExactNameSearch} onSimilarSearch = {handleSimilarSearch} getAllVacancies={getAllVacancies} setminimalSalary={setminimalSalary} minimalSalary={minimalSalary}
         setmaximalSalary={setmaximalSalary} maximalSalary={maximalSalary} amount={amount} setAmount={setAmount} setArea={setArea} setEmployment={setEmployment} setExperience={setExperience}
-        handleFilterParse={handleFilterParse}/>
+        handleFilterParse={handleFilterParse} filterSearch={filterSearch} onMagicParse={onMagicParse}/>
       </div>
       <div className="results-section">
         <VacancyList vacancies={vacancies} deleteVacancy={deleteVacancy} renderTrigger={renderTrigger}/>

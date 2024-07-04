@@ -6,12 +6,15 @@ from sqlalchemy.future import select
 from sqlalchemy import delete
 from sqlalchemy.sql import and_
 import requests 
-from datetime import datetime 
 from pydantic import BaseModel
-from typing import Optional
 
+# Это для докера
 from scr.database import engine, get_db, Base
 from scr.models import Vacancy
+
+# Это не для докера
+# from database import engine, get_db, Base
+# from models import Vacancy
 
 app = FastAPI()
 
@@ -36,16 +39,14 @@ def extract_fields(vacancy):
         'salary_from': vacancy['salary']['from'] if vacancy.get('salary') else None, 
         'salary_to': vacancy['salary']['to'] if vacancy.get('salary') else None, 
         'currency': vacancy['salary']['currency'] if vacancy.get('salary') else None, 
-        'city': vacancy['address']['city'] if vacancy.get('address') else None, 
+        'city': vacancy['area']['name'] if vacancy.get('area') else None, 
         'street': vacancy['address']['street'] if vacancy.get('address') else None, 
         'building': vacancy['address']['building'] if vacancy.get('address') else None, 
         'employer_name': vacancy['employer']['name'], 
-        # 'published_at': datetime.fromisoformat(vacancy['published_at'].replace('Z', '+00:00')),
-        
-        # 'created_at': datetime.fromisoformat(vacancy['created_at'].replace('Z', '+00:00')), 
         'url': vacancy['url'], 
         'requirement': vacancy['snippet']['requirement'] if vacancy.get('snippet') else None, 
         'responsibility': vacancy['snippet']['responsibility'] if vacancy.get('snippet') else None, 
+        'employment': vacancy['employment']['name'] if vacancy.get('employment') else None,
         'experience': vacancy['experience']['name'] if vacancy.get('experience') else None,
     }
 
@@ -64,21 +65,25 @@ async def save_vacancies_to_db(vacancies, db: AsyncSession):
 
     await db.commit()
 
-# def prepare_parse_responce(vacancies):
-#     responce = []
-#     i = 0
-#     for item in vacancies:
-#         responce[i] = extract_fields(item)
-#         i += 1
-#     return responce
 
 
 async def get_all_vacancies(db: AsyncSession): 
     result = await db.execute(select(Vacancy))
     return result.scalars().all()
 
-async def get_all_vacancies_by_salary(minimal_salary: float, maximal_salary: float, db: AsyncSession): 
-    result = await db.execute(select(Vacancy).where( and_(Vacancy.salary_from > minimal_salary, Vacancy.salary_to < maximal_salary)))
+async def get_filter_vacancies(name:str, minimal_salary: float, maximal_salary: float, db: AsyncSession): 
+    result = await db.execute(select(Vacancy).where( and_(Vacancy.salary_from > minimal_salary, Vacancy.salary_to < maximal_salary, Vacancy.name.ilike(f'%{name}%'))))
+    return result.scalars().all()
+
+async def get_filter_vacancies_if_there_is_employment(name:str, minimal_salary: float, maximal_salary: float, employment: str , db: AsyncSession): 
+    
+    tempemployment = str
+    if employment == "Part":
+        tempemployment = "Частичная занятость"
+    if employment == "Full":
+        tempemployment = "Полная занятость"
+
+    result = await db.execute(select(Vacancy).where( and_(Vacancy.salary_from > minimal_salary, Vacancy.salary_to < maximal_salary,Vacancy.name.ilike(f'%{name}%'), Vacancy.employment == tempemployment)))
     return result.scalars().all()
 
 async def get_vacancies_by_id(id: int, db: AsyncSession):
@@ -114,11 +119,6 @@ async def parse_vacancies(vacancy_query: VacancyQuery, db: AsyncSession = Depend
     vacancies = data.get('items', []) 
 
     vaclen = len(vacancies)
-    # for item in vacancies: 
-    #     # print(f"ID: {item.id}, Name: {item.name}, Salary_from: {item.salary_from}") 
-    #     vaclen += 1
-
-    # print(vaclen)
     print(vacancies)
     return {"message": f'Parsed and saved successfully {vaclen} vacancies'}
 
@@ -149,16 +149,6 @@ async def parse_vacancies(text: str, per_page: int, page: int,area: int = None, 
 
     vacancies = data.get('items', []) 
 
-    vaclen = len(vacancies)
-    # for item in vacancies: 
-    #     # print(f"ID: {item.id}, Name: {item.name}, Salary_from: {item.salary_from}") 
-    #     vaclen += 1
-
-    # print(vaclen)
-    # print(vacancies)
-    
-    # response = prepare_parse_responce(data['items'])
-
     formatted_vacancies = [extract_fields(item) for item in vacancies]
     return formatted_vacancies
 
@@ -169,9 +159,13 @@ async def fetch_vacancies(db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Vacancies not found")
     return vacancies
 
-@app.get("/get_all_vacancies_by_salary/")
-async def fetch_vacancies(salary_from: float, salary_to: float, db: AsyncSession = Depends(get_db)):
-    vacancies = await get_all_vacancies_by_salary(salary_from, salary_to, db)
+@app.get("/get_filter_vacancies/")
+async def fetch_vacancies(salary_from: float, salary_to: float,employment: str = None , name: str = ' ', db: AsyncSession = Depends(get_db)):
+    if not employment:
+        vacancies = await get_filter_vacancies(name, salary_from, salary_to, db)
+    else:
+        vacancies = await get_filter_vacancies_if_there_is_employment(name, salary_from, salary_to, employment, db)
+
     if not vacancies:
         raise HTTPException(status_code=404, detail="Vacancies not found")
     return vacancies

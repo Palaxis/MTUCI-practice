@@ -15,6 +15,8 @@ const VacancyForm = ({
   setEmployment,
   setExperience,
   handleFilterParse,
+  filterSearch,
+  onMagicParse
 }) => {
   const [name, setName] = useState("");
 
@@ -53,10 +55,40 @@ const VacancyForm = ({
         Search by similar name
       </button>
       <button onClick={() => getAllVacancies()}>Get all vacancies</button>
-      <div>
-        <input placeholder="minila salary" className="inputs" onChange={handleSetMinimal}></input>
-        <input placeholder="maximal salary" className="inputs" onChange={handleSetMaximal}></input>
+      <p>Little filter down here:</p>
+      <div className="minMaxSelect">
+        <div> <p>minimal salary</p><input placeholder="minimal salary" className="inputs" onChange={handleSetMinimal}></input></div>
+        
+        <div> <p>maximal salary</p><input placeholder="maximal salary" className="inputs" onChange={handleSetMaximal}></input></div>
+        
       </div>
+      <div className="employmentSelect">
+        <input
+            type="radio"
+            name="radio2"
+            value="value1"
+            onChange={() => setEmployment("Full")}
+          />
+          <label>Полная</label>
+          <input
+            type="radio"
+            name="radio2"
+            value="value2"
+            onChange={() => setEmployment("Part")}
+          />
+          <label>Частичная</label>
+          <input
+            type="radio"
+            name="radio2"
+            value="value2"
+            defaultChecked={true}
+            onChange={() => setEmployment(null)}
+          />
+          <label>Не важно</label>
+        </div>
+
+        {/* Да, я использовал одинаковый выбор занятости в двух формах, и использовал для двух них один и тот же хук, чтобы не плодить лишние переменные */}
+        <button onClick={() => filterSearch(name)}>Filter search</button>
       </div>
       <div className="parseDiv">
         <h4>Parse request to hh.ru:</h4>
@@ -169,6 +201,10 @@ const VacancyForm = ({
           <label>Не важно</label>
         </div>
       <button onClick={() => handleFilterParse(name)}>Parse vacancies</button>
+
+      {/* <button onClick={() => onMagicParse(name)}>
+        Magic parse
+      </button> */}
 
       </div>
       <button className="dropButton">DROP TABLE</button>

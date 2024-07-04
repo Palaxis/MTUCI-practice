@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime
 from scr.database import Base
+# from database import Base
 
 class Vacancy(Base):
     __tablename__ = 'vacancies'
@@ -18,5 +19,7 @@ class Vacancy(Base):
     url = Column(String)
     requirement = Column(String, nullable=True)
     responsibility = Column(String, nullable=True)
+    employment = Column(String, nullable=True)
     experience = Column(String, nullable=True)
+    
 
